@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Retail Hub - Simple Prototype</title>
+    <!-- Load Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons for aesthetic appeal -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom styles for Inter font and general body aesthetics */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+        /* Style for interactive cards */
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(0);
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Ensure date input looks consistent */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        /* Hide all main views initially, JS will show the active one */
+        .main-view { display: none; } 
+        /* Center the auth card absolutely in the viewport */
+        #auth-card {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50; /* above header */
+            width: 100%;
+            max-width: 28rem; /* matches max-w-md */
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        /* --- SECRET CODE GATE STYLES --- */
+        #code-gate-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(17, 24, 39, 0.95); /* Darker background */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000; /* Highest layer */
+        }
+        #code-gate-modal {
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 26rem;
+            width: 90%;
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- --- SECRET CODE GATE MODAL --- -->
+    <div id="code-gate-overlay">
+        <div id="code-gate-modal" class="space-y-6">
+            <h2 class="text-3xl font-extrabold text-center text-gray-900">Access Restricted</h2>
+            <div class="bg-indigo-50 p-4 rounded-xl text-indigo-700 text-sm font-medium border border-indigo-200">
+                Please enter the required access code to proceed to the prototype.
+            </div>
+            
+            <form id="code-gate-form" class="space-y-4">
+                <div>
+                    <label for="secret-code-input" class="block text-sm font-medium text-gray-700 mb-1">Secret Access Code</label>
+                    <input type="password" id="secret-code-input" required class="w-full p-4 text-center text-xl tracking-wider border-2 border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-sm" placeholder="••••••••••">
+                </div>
+                <button type="submit" id="code-gate-btn" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition duration-150 shadow-lg flex items-center justify-center">
+                    Unlock Access
+                </button>
+                <div id="code-gate-error" class="hidden text-red-500 text-sm mt-2 text-center font-medium"></div>
+            </form>
+        </div>
+    </div>
+    <!-- --- END SECRET CODE GATE MODAL --- -->
+
+    <!-- Main Application Content (Hidden until unlocked) -->
+    <div id="app" class="max-w-7xl mx-auto p-4 md:p-8" style="display:none;">
+        
+        <!-- Header & Navigation -->
+        <header class="bg-white shadow-lg rounded-2xl p-4 mb-8 sticky top-0 z-10 flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold text-indigo-600">Retail Hub <span class="text-sm font-light text-gray-500">Prototype</span></h1>
+            
+            <!-- Dynamic Navigation Container (Changes based on role) -->
+            <div id="nav-container" class="flex items-center space-x-4">
+                <!-- Consumer Sub-Navigation (Home/Wishlist) rendered here when active -->
+                <nav id="consumer-nav" class="hidden space-x-2 md:space-x-4">
+                    <button data-route="home-content" class="consumer-nav-link px-4 py-2 text-sm md:text-base font-medium rounded-xl transition-colors bg-indigo-500 text-white shadow-md">
+                        <i data-lucide="home" class="w-4 h-4 inline-block mr-1"></i> Home
+                    </button>
+                    <button data-route="wishlist-content" class="consumer-nav-link px-4 py-2 text-sm md:text-base font-medium rounded-xl transition-colors text-indigo-600 hover:bg-indigo-500 hover:text-white">
+                        <i data-lucide="heart" class="w-4 h-4 inline-block mr-1"></i> Wishlist
+                    </button>
+                    <button data-route="cart-content" class="consumer-nav-link px-4 py-2 text-sm md:text-base font-medium rounded-xl transition-colors text-indigo-600 hover:bg-indigo-500 hover:text-white">
+                        <i data-lucide="shopping-cart" class="w-4 h-4 inline-block mr-1"></i> My Cart
+                    </button>
+                    <button data-route="profile-content" class="consumer-nav-link px-4 py-2 text-sm md:text-base font-medium rounded-xl transition-colors text-indigo-600 hover:bg-indigo-500 hover:text-white">
+                        <i data-lucide="user" class="w-4 h-4 inline-block mr-1"></i> My Profile
+                    </button>
+                </nav>
+                
+                <!-- Role Switch Button -->
+                <button data-route="auth" class="nav-link px-4 py-2 text-sm md:text-base font-medium rounded-xl transition-colors text-gray-500 hover:bg-gray-200">
+                    <i data-lucide="shuffle" class="w-4 h-4 inline-block mr-1"></i> Switch Role
+                </button>
+                <!-- Seller-only profile button -->
+                <button data-route="seller-profile" class="seller-only px-4 py-2 text-sm md:text-base font-medium rounded-xl transition-colors text-gray-600 hover:bg-gray-200 hidden">
+                    <i data-lucide="briefcase" class="w-4 h-4 inline-block mr-1"></i> Seller Profile
+                </button>
+            </div>
+        </header>
+        
+        <!-- Main View Sections -->
+        <div id="main-content-area">
+            
+            <!-- --- AUTH VIEW (Role Selection Gate) --- -->
+            <section id="view-auth" class="main-view" aria-labelledby="access-title">
+                <div id="auth-card" class="bg-white p-8 rounded-3xl shadow-2xl space-y-6">
+                    <h2 class="text-3xl font-bold text-center text-indigo-700">Access Website</h2>
+                    
+                    <div class="bg-indigo-50 p-4 rounded-xl text-indigo-700 text-sm font-medium">
+                        Please select your role to proceed to the Retail Hub prototype.
+                    </div>
+
+                    <form id="auth-form" class="space-y-4">
+                        
+                        <!-- ROLE SELECTION -->
+                        <div id="role-selection" class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">Select Your Role</label>
+                            <div class="flex space-x-4">
+                                <label class="flex items-center bg-gray-50 p-3 rounded-xl border border-indigo-200 cursor-pointer w-1/2">
+                                    <input type="radio" name="user-role" value="consumer" id="role-consumer" required class="form-radio text-indigo-600 w-4 h-4 mr-2">
+                                    <span class="text-sm font-medium text-gray-800">Consumer</span>
+                                </label>
+                                <label class="flex items-center bg-gray-50 p-3 rounded-xl border border-indigo-200 cursor-pointer w-1/2">
+                                    <input type="radio" name="user-role" value="seller" id="role-seller" required class="form-radio text-indigo-600 w-4 h-4 mr-2">
+                                    <span class="text-sm font-medium text-gray-800">Retail Seller</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" id="access-btn" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition duration-150 shadow-lg">
+                            Access Website
+                        </button>
+                        <div id="auth-error" class="hidden text-red-500 text-sm mt-2 text-center"></div>
+                    </form>
+                </div>
+            </section>
+            <!-- --- SELLER PROFILE VIEW --- -->
+            <section id="view-seller-profile" class="main-view space-y-8 hidden">
+                <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl max-w-4xl mx-auto">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-bold text-indigo-700">Seller Profile</h2>
+                        <button id="seller-edit-btn" type="button" class="px-4 py-2 bg-gray-100 rounded-xl text-sm">Edit Profile</button>
+                    </div>
+                    <form id="seller-profile-form" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="text-lg font-semibold mb-2">Primary Contact</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <input id="seller-primary-first" placeholder="First Name" class="p-3 border rounded-xl" required disabled>
+                                    <input id="seller-primary-last" placeholder="Last Name" class="p-3 border rounded-xl" required disabled>
+                                    <input id="seller-primary-email" type="email" placeholder="Email" class="p-3 border rounded-xl" required disabled>
+                                    <input id="seller-primary-phone" placeholder="Phone" class="p-3 border rounded-xl" disabled>
+                                </div>
+                                <div class="mt-2">
+                                    <label class="inline-flex items-center"><input id="admin-primary" name="seller-admin" type="radio" value="primary" class="mr-2" disabled> Mark as Admin</label>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold mb-2">Secondary Contact</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <input id="seller-secondary-first" placeholder="First Name" class="p-3 border rounded-xl" disabled>
+                                    <input id="seller-secondary-last" placeholder="Last Name" class="p-3 border rounded-xl" disabled>
+                                    <input id="seller-secondary-email" type="email" placeholder="Email" class="p-3 border rounded-xl" disabled>
+                                    <input id="seller-secondary-phone" placeholder="Phone" class="p-3 border rounded-xl" disabled>
+                                </div>
+                                <div class="mt-2">
+                                    <label class="inline-flex items-center"><input id="admin-secondary" name="seller-admin" type="radio" value="secondary" class="mr-2" disabled> Mark as Admin</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Retail Store Name</label>
+                            <input id="seller-store-name" class="w-full p-3 border rounded-xl" required disabled>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Store Address</label>
+                            <textarea id="seller-store-address" class="w-full p-3 border rounded-xl" rows="3" disabled></textarea>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" id="seller-profile-cancel" class="px-6 py-2 bg-gray-200 rounded-xl">Cancel</button>
+                            <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-xl">Save Seller Profile</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+            
+            <!-- --- PITCH SALE VIEW (For Retail Seller) --- -->
+            <section id="view-pitch-sale" class="main-view hidden">
+                <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl max-w-3xl mx-auto">
+                    <h2 class="text-2xl font-bold text-green-700 mb-4">Pitch a Sale</h2>
+                    <p class="text-sm text-gray-600 mb-6">Complete the shipping details to confirm your pitch.</p>
+
+                    <form id="pitch-sale-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Item Name</label>
+                                <input id="pitch-item-name" type="text" readonly class="w-full p-3 border border-gray-300 rounded-xl bg-gray-100">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sale Price ($)</label>
+                                <input id="pitch-sale-price" type="number" step="0.01" class="w-full p-3 border border-gray-300 rounded-xl">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Total Shipping Count</label>
+                                <input id="pitch-shipping-count" type="number" class="w-full p-3 border border-gray-300 rounded-xl" readonly>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Shipping Date</label>
+                                <input id="pitch-shipping-date" type="date" required class="w-full p-3 border border-gray-300 rounded-xl">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" id="pitch-cancel" class="px-6 py-3 bg-gray-200 rounded-xl">Cancel</button>
+                            <button type="submit" id="pitch-confirm-btn" class="px-6 py-3 bg-green-600 text-white rounded-xl">Confirm Sale</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+            
+            <!-- --- CONSUMER HUB VIEW (Home + Wishlist) --- -->
+            <section id="view-consumer-hub" class="main-view space-y-12">
+                
+                <!-- HOME CONTENT SUB-VIEW -->
+                <div id="home-content" class="consumer-sub-view">
+                    <!-- Popular Items on Sale Section -->
+                    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl">
+                        <h2 class="text-2xl md:text-3xl font-bold text-indigo-700 mb-6 flex items-center">
+                            <i data-lucide="zap" class="w-6 h-6 mr-3 text-red-500"></i> Popular Items on Sale
+                        </h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+                            
+                            <!-- Product Card 1: Robot Vacuum Cleaner -->
+                            <div data-product-id="robot-vacuum" class="product-card bg-gray-50 p-6 rounded-2xl shadow-md card-hover border border-indigo-100 cursor-pointer">
+                                <img src="https://placehold.co/200x150/d1d1f0/3730a3?text=Vacuum+Robot" alt="Robot Vacuum Cleaner" class="w-full h-32 object-cover mb-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-white bg-red-500 px-3 py-1 rounded-full">-25% OFF</span>
+                                    <i data-lucide="shopping-bag" class="w-6 h-6 text-indigo-500"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold mb-1">Robot Vacuum Cleaner</h3>
+                                <p class="text-sm text-gray-500 mb-4">Powerful suction with smart mapping and app control.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-2xl font-bold text-indigo-600">$299.99</span>
+                                    <span class="text-sm line-through text-gray-400">$399.99</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Product Card 2: Modern Sectional Sofa -->
+                            <div data-product-id="sectional-sofa" class="product-card bg-gray-50 p-6 rounded-2xl shadow-md card-hover border border-indigo-100 cursor-pointer">
+                                <img src="https://placehold.co/200x150/f9f1ff/7c3aed?text=Sectional+Sofa" alt="Modern Sectional Sofa" class="w-full h-32 object-cover mb-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-white bg-green-500 px-3 py-1 rounded-full">NEW DEAL</span>
+                                    <i data-lucide="sofa" class="w-6 h-6 text-indigo-500"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold mb-1">Modern Sectional Sofa</h3>
+                                <p class="text-sm text-gray-500 mb-4">Comfortable, modular design in linen fabric.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-2xl font-bold text-indigo-600">$999.00</span>
+                                    <span class="text-sm line-through text-gray-400">$1200.00</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Product Card 3: Digital Air Fryer -->
+                            <div data-product-id="air-fryer" class="product-card bg-gray-50 p-6 rounded-2xl shadow-md card-hover border border-indigo-100 cursor-pointer">
+                                <img src="https://placehold.co/200x150/fef2f2/ef4444?text=Air+Fryer" alt="Digital Air Fryer" class="w-full h-32 object-cover mb-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-white bg-red-500 px-3 py-1 rounded-full">-30% OFF</span>
+                                    <i data-lucide="fryer" class="w-6 h-6 text-indigo-500"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold mb-1">Digital Air Fryer (5 Quart)</h3>
+                                <p class="text-sm text-gray-500 mb-4">Touchscreen interface for oil-free cooking.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-2xl font-bold text-indigo-600">$69.99</span>
+                                    <span class="text-sm line-through text-gray-400">$99.99</span>
+                                </div>
+                            </div>
+
+                            <!-- Product Card 4: 4K Smart TV -->
+                            <div data-product-id="smart-tv" class="product-card bg-gray-50 p-6 rounded-2xl shadow-md card-hover border border-indigo-100 cursor-pointer">
+                                <img src="https://placehold.co/200x150/e0f2fe/0369a1?text=4K+TV" alt="4K Smart TV" class="w-full h-32 object-cover mb-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-white bg-indigo-500 px-3 py-1 rounded-full">LIMITED STOCK</span>
+                                    <i data-lucide="monitor" class="w-6 h-6 text-indigo-500"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold mb-1">55" 4K Smart TV</h3>
+                                <p class="text-sm text-gray-500 mb-4">Vibrant display with built-in streaming apps.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-2xl font-bold text-indigo-600">$450.00</span>
+                                    <span class="text-sm line-through text-gray-400">$600.00</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Product Card 5: Noise-Cancelling Headphones -->
+                            <div data-product-id="headphones" class="product-card bg-gray-50 p-6 rounded-2xl shadow-md card-hover border border-indigo-100 cursor-pointer">
+                                <img src="https://placehold.co/200x150/f0fdf4/15803d?text=Headphones" alt="Noise-Cancelling Headphones" class="w-full h-32 object-cover mb-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-white bg-red-500 px-3 py-1 rounded-full">-10% OFF</span>
+                                    <i data-lucide="headphones" class="w-6 h-6 text-indigo-500"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold mb-1">Noise-Cancelling Headphones</h3>
+                                <p class="text-sm text-gray-500 mb-4">Premium sound and all-day comfort.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-2xl font-bold text-indigo-600">$199.00</span>
+                                    <span class="text-sm line-through text-gray-400">$219.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Product Card 6: Home Security Camera -->
+                            <div data-product-id="security-camera" class="product-card bg-gray-50 p-6 rounded-2xl shadow-md card-hover border border-indigo-100 cursor-pointer">
+                                <img src="https://placehold.co/200x150/ffe4e6/f43f5e?text=Camera" alt="Home Security Camera" class="w-full h-32 object-cover mb-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-semibold uppercase tracking-wider text-white bg-yellow-500 px-3 py-1 rounded-full">TOP RATED</span>
+                                    <i data-lucide="camera" class="w-6 h-6 text-indigo-500"></i>
+                                </div>
+                                <h3 class="text-xl font-semibold mb-1">Wireless Security Camera</h3>
+                                <p class="text-sm text-gray-500 mb-4">1080p HD with night vision and two-way talk.</p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-2xl font-bold text-indigo-600">$79.99</span>
+                                    <span class="text-sm line-through text-gray-400">$89.99</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Partner Retailers Section -->
+                    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl">
+                        <h2 class="text-2xl md:text-3xl font-bold text-indigo-700 mb-6 flex items-center">
+                            <i data-lucide="store" class="w-6 h-6 mr-3 text-indigo-500"></i> Our Partner Retailers
+                        </h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            <!-- Partner Logos -->
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/f0f2ff/ef3a39?text=Target" alt="Target Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/f0f2ff/ef3a39?text=Target'">
+                                <p class="text-sm font-medium">Target</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/f0f2ff/0177be?text=Walmart" alt="Walmart Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/f0f2ff/0177be?text=Walmart'">
+                                <p class="text-sm font-medium">Walmart</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/f0f2ff/7e30a8?text=Kohls" alt="Kohls Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/f0f2ff/7e30a8?text=Kohls'">
+                                <p class="text-sm font-medium">Kohl's</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/f0f2ff/006400?text=Macys" alt="Macys Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/f0f2ff/006400?text=Macys'">
+                                <p class="text-sm font-medium">Macys</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/f0f2ff/0046b3?text=HD" alt="Home Depot Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/f0f2ff/0046b3?text=HD'">
+                                <p class="text-sm font-medium">Home Depot</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/f0f2ff/004792?text=Lowes" alt="Lowes Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/f0f2ff/004792?text=Lowes'">
+                                <p class="text-sm font-medium">Lowes</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/0046b3/ffc617?text=Best+Buy" alt="Best Buy Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/0046b3/ffc617?text=Best+Buy'">
+                                <p class="text-sm font-medium">Best Buy</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 flex flex-col items-center justify-center rounded-xl shadow-sm card-hover border border-indigo-100">
+                                <img src="https://placehold.co/100x40/005892/fff000?text=Ikea" alt="Ikea Logo" class="h-10 mb-2" onerror="this.src='https://placehold.co/100x40/005892/fff000?text=Ikea'">
+                                <p class="text-sm font-medium">Ikea</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WISHLIST CONTENT SUB-VIEW -->
+                <div id="wishlist-content" class="consumer-sub-view hidden space-y-8">
+                    <h2 class="text-2xl md:text-3xl font-bold text-indigo-700 flex items-center">
+                        <i data-lucide="list-checks" class="w-6 h-6 mr-3 text-indigo-500"></i> My Smart Wishlist
+                    </h2>
+
+                    <!-- Add New Wishlist Item Form -->
+                    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-700">Add New Item (Non-Persistent)</h3>
+                        <form id="wishlist-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <!-- Item Name -->
+                                <div>
+                                    <label for="item-name" class="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                                    <input type="text" id="item-name" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-sm" placeholder="e.g., Samsung 55' 4K TV">
+                                </div>
+                                <!-- Product Link -->
+                                <div>
+                                    <label for="product-link" class="block text-sm font-medium text-gray-700 mb-1">Product Link (Optional)</label>
+                                    <input type="url" id="product-link" class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-sm" placeholder="https://example.com/product/123">
+                                </div>
+                                <!-- Target Price -->
+                                <div>
+                                    <label for="target-price" class="block text-sm font-medium text-gray-700 mb-1">Target Price ($)</label>
+                                    <input type="number" step="0.01" min="0" id="target-price" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-sm" placeholder="e.g., 850.00">
+                                </div>
+                                <!-- Target Date -->
+                                <div>
+                                    <label for="wait-date" class="block text-sm font-medium text-gray-700 mb-1">Target Date (How long will you wait)</label>
+                                    <input type="date" id="wait-date" required class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-sm">
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition duration-150 shadow-lg shadow-indigo-200 flex items-center justify-center">
+                                <i data-lucide="plus-circle" class="w-5 h-5 mr-2"></i> Add to Wishlist
+                            </button>
+                            <div id="form-error" class="hidden text-red-500 text-sm mt-2"></div>
+                        </form>
+                    </div>
+
+                    <!-- Display Wishlist Items -->
+                    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl overflow-x-auto">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-700">Saved Items (Lost on Refresh)</h3>
+                        <div id="wishlist-container">
+                            <!-- Wishlist table will be dynamically generated here -->
+                            <p class="text-gray-500 text-center p-8" id="empty-state">Your wishlist is currently empty. Add an item above!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CART CONTENT SUB-VIEW -->
+                <div id="cart-content" class="consumer-sub-view hidden space-y-8">
+                    <h2 class="text-2xl md:text-3xl font-bold text-indigo-700 flex items-center">
+                        <i data-lucide="shopping-cart" class="w-6 h-6 mr-3 text-indigo-500"></i> My Cart
+                    </h2>
+
+                    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl">
+                        <div id="cart-container">
+                            <p class="text-gray-500 text-center p-8">Your cart is empty.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PROFILE CONTENT SUB-VIEW (Consumer) -->
+                <div id="profile-content" class="consumer-sub-view hidden space-y-8">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl md:text-3xl font-bold text-indigo-700 flex items-center">
+                            <i data-lucide="user" class="w-6 h-6 mr-3 text-indigo-500"></i> My Profile
+                        </h2>
+                        <div>
+                            <button id="consumer-edit-btn" type="button" class="px-4 py-2 bg-gray-100 rounded-xl text-sm">Edit Profile</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl max-w-3xl">
+                        <form id="consumer-profile-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">First Name</label>
+                                    <input id="consumer-first" type="text" class="w-full p-3 border rounded-xl" required disabled>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Last Name</label>
+                                    <input id="consumer-last" type="text" class="w-full p-3 border rounded-xl" required disabled>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                                    <input id="consumer-email" type="email" class="w-full p-3 border rounded-xl" required disabled>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Phone</label>
+                                    <input id="consumer-phone" type="tel" class="w-full p-3 border rounded-xl" disabled>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Address</label>
+                                <textarea id="consumer-address" class="w-full p-3 border rounded-xl" rows="3" disabled></textarea>
+                            </div>
+
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" id="consumer-profile-cancel" class="px-6 py-2 bg-gray-200 rounded-xl">Cancel</button>
+                                <button type="submit" id="consumer-profile-save" class="px-6 py-2 bg-indigo-600 text-white rounded-xl" disabled>Save Profile</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </section>
+            
+            <!-- --- RETAIL SELLER DASHBOARD VIEW (Mocked) --- -->
+            <section id="view-seller-dashboard" class="main-view space-y-8">
+                <h2 class="text-2xl md:text-3xl font-bold text-indigo-700 flex items-center">
+                    <i data-lucide="trending-up" class="w-6 h-6 mr-3 text-green-500"></i> Seller Demand Dashboard (MOCKED DATA)
+                </h2>
+                
+                <div class="bg-white p-6 md:p-8 rounded-3xl shadow-xl overflow-x-auto">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700">Customer Demand Insight (Aggregated Wishlist)</h3>
+                    <p class="text-gray-500 mb-4">This data is static and simulates the aggregated demand you would see if customers' wishlists were stored in a database.</p>
+                    
+                    <!-- Mocked Aggregation Table -->
+                    <table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-xl overflow-hidden">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customers Interested</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Average Target Price</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="seller-demand-tbody">
+                            <tr data-product-id="air-fryer" class="demand-row hover:bg-green-50 transition duration-150 cursor-pointer">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Digital Air Fryer (5 Quart)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">128</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$74.50</td>
+                            </tr>
+                            <tr data-product-id="sectional-sofa" class="demand-row hover:bg-green-50 transition duration-150 cursor-pointer">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Modern Sectional Sofa</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">45</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$950.00</td>
+                            </tr>
+                            <tr data-product-id="robot-vacuum" class="demand-row hover:bg-green-50 transition duration-150 cursor-pointer">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Robot Vacuum Cleaner</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">88</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$275.99</td>
+                            </tr>
+                            <tr data-product-id="smart-tv" class="demand-row hover:bg-green-50 transition duration-150 cursor-pointer">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">55" 4K Smart TV</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">62</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$400.00</td>
+                            </tr>
+                            <tr data-product-id="headphones" class="demand-row hover:bg-green-50 transition duration-150 cursor-pointer">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Noise-Cancelling Headphones</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">31</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$180.00</td>
+                            </tr>
+                            <tr data-product-id="security-camera" class="demand-row hover:bg-green-50 transition duration-150 cursor-pointer">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Wireless Security Camera</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">55</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$65.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <!-- --- PRODUCT DETAIL VIEW --- -->
+            <section id="view-product-detail" class="main-view space-y-8">
+                <button onclick="goBackFromProductDetail()" class="flex items-center text-indigo-600 hover:text-indigo-800 font-medium mb-4 transition duration-150">
+                    <i data-lucide="arrow-left" class="w-5 h-5 mr-2"></i> Back to Previous View
+                </button>
+
+                <div class="bg-white p-6 md:p-10 rounded-3xl shadow-xl space-y-8">
+                    <h2 id="product-detail-name" class="text-3xl md:text-4xl font-extrabold text-gray-900"></h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <!-- Product Image & CTA -->
+                        <div class="lg:col-span-1 space-y-6">
+                            <img id="product-detail-image" src="" alt="Product Image" class="w-full h-auto rounded-xl shadow-lg border border-gray-200">
+                            <p class="text-sm font-medium text-gray-500">Current Price:</p>
+                            <p id="product-detail-price" class="text-4xl font-bold text-red-600"></p>
+                            <button id="product-cta-btn" class="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition duration-150 shadow-lg flex items-center justify-center">
+                                <i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i> Add to Cart
+                            </button>
+                        </div>
+                        
+                        <!-- Details -->
+                        <div class="lg:col-span-2 space-y-6">
+                            <div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                <h3 class="text-xl font-semibold mb-3 text-indigo-700">Detailed Description</h3>
+                                <p id="product-detail-description" class="text-gray-700 leading-relaxed"></p>
+                            </div>
+                            
+                            <h3 class="text-xl font-semibold text-gray-700 border-b pb-2">Technical Specifications</h3>
+                            <ul id="product-detail-specs" class="space-y-2 text-gray-700 list-disc pl-5">
+                                <!-- Specs list generated here -->
+                            </ul>
+
+                            <h3 class="text-xl font-semibold text-gray-700 border-b pb-2">Price History (Mock)</h3>
+                            <div class="text-sm text-gray-500">
+                                <p>Past 30 Days: Highest <span class="font-bold text-red-500">$600.00</span> / Lowest <span class="font-bold text-green-500">$450.00</span></p>
+                                <p>Pricing data simulated for prototype purposes.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+
+        </div>
+    </div>
+
+    <script>
+        // --- PRODUCT DATA (Static, since we removed Firebase) ---
+        const products = {
+            "robot-vacuum": {
+                name: "Robot Vacuum Cleaner",
+                description: "This state-of-the-art robot vacuum features advanced LiDAR navigation, powerful 2,500Pa suction, and multi-floor mapping. Control it easily via the mobile app, set no-go zones, and schedule cleanings while you are away. It automatically returns to its base to recharge.",
+                price: 299.99,
+                imageUrl: "https://placehold.co/400x300/d1d1f0/3730a3?text=Vacuum+Robot",
+                specs: ["LiDAR Navigation", "2,500Pa Suction Power", "Multi-Floor Mapping", "Wi-Fi Connectivity"],
+            },
+            "sectional-sofa": {
+                name: "Modern Sectional Sofa",
+                description: "A large, modular sectional sofa perfect for family rooms. Upholstered in durable, stain-resistant linen fabric with high-density foam cushions for superior comfort and longevity. Its modular design allows for easy rearrangement to fit any space.",
+                price: 999.00,
+                imageUrl: "https://placehold.co/400x300/f9f1ff/7c3aed?text=Sectional+Sofa",
+                specs: ["Linen Blend Fabric", "Modular Design", "High-Density Foam", "Solid Wood Frame"],
+            },
+            "air-fryer": {
+                name: "Digital Air Fryer (5 Quart)",
+                description: "Cook your favorite meals with 85% less fat using this 5-quart digital air fryer. Features a responsive LED touchscreen with 8 pre-set cooking programs for fries, chicken, steak, and more. Non-stick basket is dishwasher safe for easy clean-up.",
+                price: 69.99,
+                imageUrl: "https://placehold.co/400x300/fef2f2/ef4444?text=Air+Fryer",
+                specs: ["5-Quart Capacity", "8 Pre-set Programs", "LED Touchscreen", "1500W Power"],
+            },
+            "smart-tv": {
+                name: "55\" 4K Smart TV",
+                description: "Experience stunning clarity with this 55-inch 4K UHD Smart TV. Quantum Dot technology delivers over a billion shades of color. Features built-in voice control and access to all major streaming services.",
+                price: 450.00,
+                imageUrl: "https://placehold.co/400x300/e0f2fe/0369a1?text=4K+TV",
+                specs: ["55 inch QLED Display", "4K UHD Resolution", "Voice Control Ready", "3 HDMI Ports"],
+            },
+            "headphones": {
+                name: "Noise-Cancelling Headphones",
+                description: "Industry-leading noise cancellation technology blocks out distractions, perfect for travel or focusing on work. Enjoy up to 30 hours of playback on a single charge. Features a comfortable, ergonomic over-ear design.",
+                price: 199.00,
+                imageUrl: "https://placehold.co/400x300/f0fdf4/15803d?text=Headphones",
+                specs: ["Active Noise Cancellation", "30-Hour Battery Life", "Ergonomic Design", "USB-C Charging"],
+            },
+            "security-camera": {
+                name: "Wireless Security Camera",
+                description: "Keep your home secure with this easy-to-install wireless camera. Features 1080p HD video, motion detection alerts, and two-way audio communication. Weatherproof design is suitable for indoor or outdoor use.",
+                price: 79.99,
+                imageUrl: "https://placehold.co/400x300/ffe4e6/f43f5e?text=Camera",
+                specs: ["1080p HD Video", "Motion Detection", "Two-Way Audio", "Weatherproof (IP65)"],
+            },
+        };
+
+    // --- GLOBAL STATE & DOM REFERENCES ---
+    let wishlistItems = []; // Array to hold non-persistent data
+    let currentRoute = 'auth'; // Track top-level view
+    let currentConsumerSubRoute = 'home-content'; // Track Home/Wishlist in Consumer Hub
+    let currentUserRole = null; // 'consumer' or 'seller'
+    let cart = []; // simple in-memory cart for consumer
+    let sellerSelectedShippingCount = 0; // when seller selects a demand row
+        
+    // Element references, captured once on load
+    let authForm, consumerNav, mainViews, consumerSubViews, wishlistForm, wishlistContainer;
+
+
+        /**
+         * Switches the active top-level view.
+         * @param {string} route - The route identifier (e.g., 'auth', 'consumer-hub', 'seller-dashboard', 'product-detail').
+         */
+        function navigateTo(route, productId = null) {
+            currentRoute = route;
+
+            // 1. Hide all main views
+            mainViews.forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // 2. Show the target view
+            const targetView = document.getElementById(`view-${route}`);
+            // Also manage the pitch view visibility explicitly
+            const pitchView = document.getElementById('view-pitch-sale');
+            if (pitchView) pitchView.style.display = 'none'; 
+
+            if (targetView) {
+                targetView.style.display = 'block';
+            }
+
+            // 3. Handle specific view logic
+            if (route === 'product-detail' && productId) {
+                renderProductDetail(productId);
+            }
+            
+            // 4. Update navigation visibility
+            const switchRoleBtn = document.querySelector('[data-route="auth"]');
+            
+            if (route === 'auth') {
+                consumerNav.classList.add('hidden');
+                if (switchRoleBtn) switchRoleBtn.style.display = 'none';
+            } else if (route === 'consumer-hub') {
+                consumerNav.classList.remove('hidden');
+                if (switchRoleBtn) switchRoleBtn.style.display = 'block';
+                navigateToConsumerSubRoute(currentConsumerSubRoute); 
+                // hide seller-only buttons
+                document.querySelectorAll('.seller-only').forEach(el => el.classList.add('hidden'));
+            } else if (route === 'seller-dashboard') {
+                consumerNav.classList.add('hidden');
+                if (switchRoleBtn) switchRoleBtn.style.display = 'block';
+                // show seller-only buttons
+                document.querySelectorAll('.seller-only').forEach(el => el.classList.remove('hidden'));
+            } else if (route === 'seller-profile') {
+                consumerNav.classList.add('hidden');
+                if (switchRoleBtn) switchRoleBtn.style.display = 'block';
+                // show seller profile view and ensure seller buttons visible
+                document.querySelectorAll('.seller-only').forEach(el => el.classList.remove('hidden'));
+                // load seller profile data
+                loadSellerProfileToForm();
+            } else if (route === 'product-detail') {
+                 // Hide consumer nav when on product detail page
+                consumerNav.classList.add('hidden');
+                if (switchRoleBtn) switchRoleBtn.style.display = 'block';
+            }
+            
+            // Re-render icons
+            lucide.createIcons();
+        }
+        
+        /**
+         * Switches between Home and Wishlist within the Consumer Hub.
+         * @param {string} route - The route identifier (e.g., 'home-content', 'wishlist-content').
+         */
+        function navigateToConsumerSubRoute(route) {
+            currentConsumerSubRoute = route;
+            
+            // 1. Hide all consumer sub-views
+            consumerSubViews.forEach(subview => {
+                subview.classList.add('hidden');
+            });
+            
+            // 2. Show the target sub-view
+            const targetSubView = document.getElementById(route);
+            if (targetSubView) {
+                targetSubView.classList.remove('hidden');
+            }
+            
+            // 3. Update internal navigation buttons
+            document.querySelectorAll('.consumer-nav-link').forEach(btn => {
+                btn.classList.remove('bg-indigo-500', 'text-white', 'shadow-md');
+                btn.classList.add('text-indigo-600', 'hover:bg-indigo-500', 'hover:text-white');
+            });
+            const activeBtn = document.querySelector(`.consumer-nav-link[data-route="${route}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-indigo-500', 'text-white', 'shadow-md');
+                activeBtn.classList.remove('text-indigo-600', 'hover:bg-indigo-500', 'hover:text-white');
+            }
+            
+            if (route === 'wishlist-content') {
+              renderWishlist();
+          } else if (route === 'profile-content') {
+              loadConsumerProfileToForm();
+          } else if (route === 'cart-content') {
+              renderCart();
+            }
+            // Re-render icons
+            lucide.createIcons();
+        }
+
+        function handleAuth(e) {
+            e.preventDefault();
+            const role = document.querySelector('input[name="user-role"]:checked')?.value;
+            const authError = document.getElementById('auth-error');
+            authError.classList.add('hidden');
+
+            if (!role) {
+                authError.textContent = "Please select a role: Consumer or Retail Seller.";
+                authError.classList.remove('hidden');
+                return;
+            }
+
+            // remember the current role for conditional UI behavior
+            currentUserRole = role;
+
+            if (role === 'consumer') {
+                navigateTo('consumer-hub');
+                navigateToConsumerSubRoute('home-content'); // Ensure consumer starts on Home
+            } else if (role === 'seller') {
+                navigateTo('seller-dashboard');
+            }
+        }
+        
+        function renderProductDetail(productId) {
+            const product = products[productId];
+            // ensure pitch view is hidden when opening detail
+            const pitchView = document.getElementById('view-pitch-sale');
+            if (pitchView) pitchView.style.display = 'none';
+
+            if (!product) {
+                document.getElementById('product-detail-name').textContent = "Product Not Found";
+                document.getElementById('product-detail-description').textContent = "The requested product could not be located in our catalog.";
+                document.getElementById('product-detail-image').src = "https://placehold.co/400x300/e0e0e0/555555?text=Error";
+                document.getElementById('product-detail-price').textContent = "$0.00";
+                document.getElementById('product-detail-specs').innerHTML = "";
+                return;
+            }
+
+            document.getElementById('product-detail-name').textContent = product.name;
+            document.getElementById('product-detail-description').textContent = product.description;
+            document.getElementById('product-detail-image').src = product.imageUrl;
+            document.getElementById('product-detail-price').textContent = `$${product.price.toFixed(2)}`;
+
+            const specsList = document.getElementById('product-detail-specs');
+            specsList.innerHTML = product.specs.map(spec => 
+                `<li class="border-b border-gray-100 pb-1">${spec}</li>`
+            ).join('');
+
+            // Configure CTA depending on role
+            const cta = document.getElementById('product-cta-btn');
+            if (!cta) return;
+
+            // remove previous handlers
+            cta.onclick = null;
+
+            if (currentUserRole === 'seller') {
+                cta.innerHTML = '<i data-lucide="megaphone" class="w-5 h-5 mr-2"></i> Pitch a sale';
+                cta.classList.remove('bg-indigo-600');
+                cta.classList.add('bg-green-600');
+                cta.onclick = () => {
+                    // open pitch sale view and prefill
+                    renderPitchSale(productId);
+                    // show pitch view
+                    document.getElementById('view-product-detail').style.display = 'none';
+                    document.getElementById('view-pitch-sale').style.display = 'block';
+                };
+            } else {
+                cta.innerHTML = '<i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i> Add to Cart';
+                cta.classList.remove('bg-green-600');
+                cta.classList.add('bg-indigo-600');
+                cta.onclick = () => {
+                    cart.push({ id: productId, name: product.name, price: product.price });
+                    renderCart();
+                    // navigate consumer to cart
+                    navigateTo('consumer-hub');
+                    navigateToConsumerSubRoute('cart-content');
+                };
+            }
+
+            // re-create lucide icons for the updated button
+            lucide.createIcons();
+        }
+
+        // --- CART RENDERING ---
+        function renderCart() {
+            const container = document.getElementById('cart-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (cart.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 text-center p-8">Your cart is empty.</p>`;
+                return;
+            }
+
+            const list = document.createElement('div');
+            list.className = 'space-y-4';
+
+            let subtotal = 0;
+            cart.forEach((item, idx) => {
+                subtotal += item.price;
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between p-4 border rounded-xl';
+                row.innerHTML = `
+                    <div>
+                        <div class="font-medium">${item.name}</div>
+                        <div class="text-sm text-gray-500">$${item.price.toFixed(2)}</div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button data-idx="${idx}" class="remove-cart px-3 py-1 bg-red-50 text-red-600 rounded-md">Remove</button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+
+            const summary = document.createElement('div');
+            summary.className = 'mt-6 p-4 border rounded-xl bg-gray-50';
+            summary.innerHTML = `
+                <div class="flex justify-between mb-2"><span class="text-sm text-gray-600">Subtotal</span><span class="font-bold">$${subtotal.toFixed(2)}</span></div>
+                <div class="flex justify-between mb-4"><span class="text-sm text-gray-600">Shipping</span><span class="font-medium">$5.00</span></div>
+                <div class="flex justify-between text-lg font-semibold"><span>Total</span><span>$${(subtotal + 5).toFixed(2)}</span></div>
+                <div class="mt-4 flex justify-end"><button id="checkout-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-xl">Proceed to Checkout</button></div>
+            `;
+
+            container.appendChild(list);
+            container.appendChild(summary);
+
+            // attach listeners
+            document.querySelectorAll('.remove-cart').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.currentTarget.getAttribute('data-idx'), 10);
+                    if (!isNaN(idx)) {
+                        cart.splice(idx, 1);
+                        renderCart();
+                    }
+                });
+            });
+
+            const checkout = document.getElementById('checkout-btn');
+            if (checkout) {
+                checkout.onclick = () => {
+                    alert('Checkout flow not implemented in prototype.\nOrder total: $' + (subtotal + 5).toFixed(2));
+                };
+            }
+        }
+
+        // --- PITCH SALE RENDER & SUBMIT ---
+        function renderPitchSale(productId) {
+            const product = products[productId];
+            if (!product) return;
+            document.getElementById('pitch-item-name').value = product.name;
+            document.getElementById('pitch-sale-price').value = product.price.toFixed(2);
+            document.getElementById('pitch-shipping-count').value = sellerSelectedShippingCount || 0;
+
+            // wire up form submit
+            const form = document.getElementById('pitch-sale-form');
+            if (!form) return;
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                const date = document.getElementById('pitch-shipping-date').value;
+                if (!date) {
+                    alert('Please select a shipping date.');
+                    return;
+                }
+                // simulate confirmation
+                alert(`Sale pitched for ${product.name} at $${document.getElementById('pitch-sale-price').value}. Shipping on ${date}. Qty: ${document.getElementById('pitch-shipping-count').value}`);
+                // return to seller dashboard
+                document.getElementById('view-pitch-sale').style.display = 'none';
+                navigateTo('seller-dashboard');
+            };
+
+            const cancel = document.getElementById('pitch-cancel');
+            if (cancel) cancel.onclick = () => {
+                document.getElementById('view-pitch-sale').style.display = 'none';
+                document.getElementById('view-product-detail').style.display = 'block';
+            };
+        }
+
+        // --- PROFILE SAVE / LOAD ---
+        function loadConsumerProfileToForm() {
+            const data = localStorage.getItem('consumerProfile');
+            if (!data) {
+                // show dummy data when no saved profile exists
+                document.getElementById('consumer-first').value = 'John';
+                document.getElementById('consumer-last').value = 'Doe';
+                document.getElementById('consumer-email').value = 'john.doe@example.com';
+                document.getElementById('consumer-phone').value = '555-1234';
+                document.getElementById('consumer-address').value = '123 Main St, Springfield';
+                // ensure form is read-only
+                setConsumerFormEditable(false);
+                return;
+            }
+            try {
+                const obj = JSON.parse(data);
+                document.getElementById('consumer-first').value = obj.first || '';
+                document.getElementById('consumer-last').value = obj.last || '';
+                document.getElementById('consumer-email').value = obj.email || '';
+                document.getElementById('consumer-phone').value = obj.phone || '';
+                document.getElementById('consumer-address').value = obj.address || '';
+                setConsumerFormEditable(false);
+            } catch (e) {
+                console.warn('Failed to parse consumer profile:', e);
+            }
+        }
+
+        function saveConsumerProfile(e) {
+            e.preventDefault();
+            const obj = {
+                first: document.getElementById('consumer-first').value.trim(),
+                last: document.getElementById('consumer-last').value.trim(),
+                email: document.getElementById('consumer-email').value.trim(),
+                phone: document.getElementById('consumer-phone').value.trim(),
+                address: document.getElementById('consumer-address').value.trim(),
+            };
+            localStorage.setItem('consumerProfile', JSON.stringify(obj));
+            alert('Consumer profile saved.');
+            setConsumerFormEditable(false);
+        }
+
+        // Seller profile persistence
+        function loadSellerProfileToForm() {
+            const data = localStorage.getItem('sellerProfile');
+            if (!data) {
+                // dummy seller profile
+                document.getElementById('seller-primary-first').value = 'Alice';
+                document.getElementById('seller-primary-last').value = 'Smith';
+                document.getElementById('seller-primary-email').value = 'alice@example.com';
+                document.getElementById('seller-primary-phone').value = '555-9876';
+                document.getElementById('seller-secondary-first').value = 'Bob';
+                document.getElementById('seller-secondary-last').value = 'Jones';
+                document.getElementById('seller-secondary-email').value = 'bob@example.com';
+                document.getElementById('seller-secondary-phone').value = '555-6789';
+                document.getElementById('seller-store-name').value = "Alice's Emporium";
+                document.getElementById('seller-store-address').value = '456 Market Ave, Metropolis';
+                // default admin
+                document.getElementById('admin-primary').checked = true;
+                setSellerFormEditable(false);
+                return;
+            }
+            try {
+                const obj = JSON.parse(data);
+                // set primary contact
+                document.getElementById('seller-primary-first').value = obj.primary?.first || '';
+                document.getElementById('seller-primary-last').value = obj.primary?.last || '';
+                document.getElementById('seller-primary-email').value = obj.primary?.email || '';
+                document.getElementById('seller-primary-phone').value = obj.primary?.phone || '';
+                // secondary
+                document.getElementById('seller-secondary-first').value = obj.secondary?.first || '';
+                document.getElementById('seller-secondary-last').value = obj.secondary?.last || '';
+                document.getElementById('seller-secondary-email').value = obj.secondary?.email || '';
+                document.getElementById('seller-secondary-phone').value = obj.secondary?.phone || '';
+                // admin selection
+                if (obj.admin === 'primary') document.getElementById('admin-primary').checked = true;
+                else if (obj.admin === 'secondary') document.getElementById('admin-secondary').checked = true;
+                // store and address
+                document.getElementById('seller-store-name').value = obj.storeName || '';
+                document.getElementById('seller-store-address').value = obj.storeAddress || '';
+                setSellerFormEditable(false);
+            } catch (e) {
+                console.warn('Failed to parse seller profile:', e);
+            }
+        }
+
+        function saveSellerProfile(e) {
+            e.preventDefault();
+            const obj = {
+                primary: {
+                    first: document.getElementById('seller-primary-first').value.trim(),
+                    last: document.getElementById('seller-primary-last').value.trim(),
+                    email: document.getElementById('seller-primary-email').value.trim(),
+                    phone: document.getElementById('seller-primary-phone').value.trim(),
+                },
+                secondary: {
+                    first: document.getElementById('seller-secondary-first').value.trim(),
+                    last: document.getElementById('seller-secondary-last').value.trim(),
+                    email: document.getElementById('seller-secondary-email').value.trim(),
+                    phone: document.getElementById('seller-secondary-phone').value.trim(),
+                },
+                admin: document.querySelector('input[name="seller-admin"]:checked')?.value || 'primary',
+                storeName: document.getElementById('seller-store-name').value.trim(),
+                storeAddress: document.getElementById('seller-store-address').value.trim(),
+            };
+            localStorage.setItem('sellerProfile', JSON.stringify(obj));
+            alert('Seller profile saved.');
+            setSellerFormEditable(false);
+        }
+
+        // --- PROFILE EDIT TOGGLE HELPERS ---
+        let consumerFormEditable = false;
+        let sellerFormEditable = false;
+
+        function setConsumerFormEditable(isEditable) {
+            consumerFormEditable = !!isEditable;
+            const fields = ['consumer-first','consumer-last','consumer-email','consumer-phone','consumer-address'];
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = !consumerFormEditable;
+            });
+            const saveBtn = document.getElementById('consumer-profile-save');
+            if (saveBtn) saveBtn.disabled = !consumerFormEditable;
+            const editBtn = document.getElementById('consumer-edit-btn');
+            if (editBtn) editBtn.textContent = consumerFormEditable ? 'Cancel Edit' : 'Edit Profile';
+        }
+
+        function setSellerFormEditable(isEditable) {
+            sellerFormEditable = !!isEditable;
+            const form = document.getElementById('seller-profile-form');
+            if (!form) return;
+            // toggle all inputs/textarea/radio inside seller form
+            form.querySelectorAll('input, textarea, select, button').forEach(el => {
+                // keep the submit button enabled only when editable
+                if (el.type === 'submit') {
+                    el.disabled = !sellerFormEditable;
+                } else if (el.id === 'seller-profile-cancel') {
+                    // leave cancel active
+                    el.disabled = false;
+                } else {
+                    el.disabled = !sellerFormEditable;
+                }
+            });
+            const editBtn = document.getElementById('seller-edit-btn');
+            if (editBtn) editBtn.textContent = sellerFormEditable ? 'Cancel Edit' : 'Edit Profile';
+        }
+
+        // --- ROUTING HELPERS ---
+        function goBackFromProductDetail() {
+            // behavior depends on role
+            if (currentUserRole === 'seller') {
+                navigateTo('seller-dashboard');
+            } else {
+                navigateTo('consumer-hub');
+                navigateToConsumerSubRoute('home-content');
+            }
+        }
+        
+        // --- WISHLIST CRUD (Non-Persistent) ---
+
+        function renderWishlist() {
+            const container = wishlistContainer;
+            container.innerHTML = ''; 
+
+            if (wishlistItems.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 text-center p-8" id="empty-state">Your wishlist is currently empty. Add an item above!</p>`;
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'min-w-full divide-y divide-gray-200 border border-gray-200 rounded-xl overflow-hidden';
+            table.innerHTML = `
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target Price</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Target Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Product Link</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="wishlist-tbody"></tbody>
+            `;
+            container.appendChild(table);
+            const tbody = document.getElementById('wishlist-tbody');
+
+            wishlistItems.forEach((item, index) => {
+                const targetDate = item.waitDate ? new Date(item.waitDate + 'T00:00:00').toLocaleDateString() : 'N/A';
+                
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-indigo-50 transition duration-150';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-bold">$${item.targetPrice.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-medium hidden sm:table-cell">${targetDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-500 hidden md:table-cell">
+                        ${item.link ? `<a href="${item.link}" target="_blank" class="hover:underline flex items-center">Link <i data-lucide="external-link" class="w-4 h-4 ml-1"></i></a>` : 'N/A'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button data-index="${index}" class="delete-btn text-red-600 hover:text-red-900 p-2 rounded-full hover:bg-red-100 transition duration-150">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            lucide.createIcons();
+        }
+
+        function addItemToWishlist(e) {
+            e.preventDefault();
+            const form = e.target;
+            const name = form['item-name'].value.trim();
+            const link = form['product-link'].value.trim();
+            const price = parseFloat(form['target-price'].value);
+            const waitDate = form['wait-date'].value;
+
+            if (!name || isNaN(price) || price <= 0 || !waitDate) {
+                document.getElementById('form-error').textContent = "Please fill all required fields.";
+                document.getElementById('form-error').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('form-error').classList.add('hidden');
+
+            const newItem = {
+                name: name,
+                link: link,
+                targetPrice: price,
+                waitDate: waitDate,
+            };
+
+            wishlistItems.push(newItem);
+            form.reset();
+            renderWishlist();
+        }
+
+        function deleteWishlistItem(index) {
+            // Simple DOM confirmation replacement
+            if (!window.confirm("Are you sure you want to remove this item from your wishlist?")) {
+                return;
+            }
+            
+            wishlistItems.splice(index, 1);
+            renderWishlist();
+        }
+
+
+        // --- SECRET CODE GATE LOGIC (Copied from previous file) ---
+        // Obfuscated code for "Lorgan2025" using character codes (ASCII/Unicode)
+        const SCRAMBLED_CODE_PARTS = [76, 111, 114, 103, 97, 110, 50, 48, 50, 53];
+        
+        /**
+         * Decodes the array of character codes back into the secret code string.
+         * @returns {string} The decoded secret code.
+         */
+        function getSecretCode() {
+            return String.fromCharCode(...SCRAMBLED_CODE_PARTS);
+        }
+
+        function handleCodeGate(e) {
+            e.preventDefault();
+            const input = document.getElementById('secret-code-input');
+            const error = document.getElementById('code-gate-error');
+            
+            error.classList.add('hidden');
+            
+            // Get the actual secret code by decoding the parts
+            const actualCode = getSecretCode();
+
+            if (input.value === actualCode) {
+                // Successful code entry: hide gate and show app
+                document.getElementById('code-gate-overlay').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                // Continue to the main application initialization
+                startAppContent();
+            } else {
+                error.textContent = "Invalid code. Please try again.";
+                error.classList.remove('hidden');
+                input.value = ''; // Clear input for retry
+                input.focus();
+            }
+        }
+        
+        /**
+         * The original initApp logic, now run *after* successful code entry.
+         */
+        function startAppContent() {
+             // 1. Capture DOM elements
+            authForm = document.getElementById('auth-form');
+            consumerNav = document.getElementById('consumer-nav');
+            mainViews = document.querySelectorAll('.main-view');
+            consumerSubViews = document.querySelectorAll('.consumer-sub-view');
+            wishlistForm = document.getElementById('wishlist-form');
+            wishlistContainer = document.getElementById('wishlist-container');
+            
+            if (!authForm || mainViews.length === 0) {
+                 console.error("Critical DOM elements missing. Cannot initialize app.");
+                 return;
+            }
+
+            // 2. Attach listeners
+            authForm.addEventListener('submit', handleAuth);
+            
+            // Global delegated event listeners for navigation and interaction
+            document.getElementById('app').addEventListener('click', (e) => {
+                const routeBtn = e.target.closest('[data-route]');
+                if (routeBtn) {
+                    const route = routeBtn.getAttribute('data-route');
+                    
+                    if (route === 'auth' || route === 'seller-dashboard' || route === 'seller-profile') {
+                        // Top-level navigation (Switch Role)
+                        navigateTo(route);
+                    } else if (route === 'home-content' || route === 'wishlist-content' || route === 'cart-content' || route === 'profile-content') {
+                        // Consumer Hub internal navigation
+                        navigateToConsumerSubRoute(route);
+                    }
+                }
+                
+                // Handle product card clicks (Consumer Home Page)
+                const productCard = e.target.closest('.product-card');
+                if (productCard && currentConsumerSubRoute === 'home-content') {
+                    const productId = productCard.getAttribute('data-product-id');
+                    if (productId) {
+                        navigateTo('product-detail', productId);
+                    }
+                }
+
+                // Handle seller demand row clicks
+                const demandRow = e.target.closest('.demand-row');
+                if (demandRow && currentRoute === 'seller-dashboard') {
+                    const productId = demandRow.getAttribute('data-product-id');
+                    // capture customers interested (2nd cell) as shipping count
+                    const customersCell = demandRow.querySelector('td:nth-child(2)');
+                    if (customersCell) {
+                        const parsed = parseInt(customersCell.textContent.replace(/[^0-9]/g, ''), 10);
+                        sellerSelectedShippingCount = isNaN(parsed) ? 0 : parsed;
+                    } else {
+                        sellerSelectedShippingCount = 0;
+                    }
+                    if (productId) {
+                        navigateTo('product-detail', productId);
+                    }
+                }
+            });
+
+            // Delegated event listener for wishlist deletion
+            document.getElementById('view-consumer-hub').addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (deleteBtn && currentConsumerSubRoute === 'wishlist-content') {
+                    const itemIndex = parseInt(deleteBtn.getAttribute('data-index'), 10); 
+                    deleteWishlistItem(itemIndex);
+                }
+            });
+
+            // Form submission listener for adding wishlist items
+            if(wishlistForm) wishlistForm.addEventListener('submit', addItemToWishlist);
+
+            // Profile form handlers (consumer)
+            const consumerForm = document.getElementById('consumer-profile-form');
+            if (consumerForm) {
+                consumerForm.addEventListener('submit', saveConsumerProfile);
+                document.getElementById('consumer-profile-cancel').addEventListener('click', () => {
+                    navigateTo('consumer-hub');
+                    navigateToConsumerSubRoute('home-content');
+                });
+            }
+
+            // Consumer edit button
+            const consumerEditBtn = document.getElementById('consumer-edit-btn');
+            if (consumerEditBtn) {
+                consumerEditBtn.addEventListener('click', () => {
+                    if (consumerFormEditable) {
+                        // cancel edits and reload saved values
+                        loadConsumerProfileToForm();
+                        setConsumerFormEditable(false);
+                    } else {
+                        setConsumerFormEditable(true);
+                    }
+                });
+            }
+
+            // Seller profile button visibility: hide by default
+            const sellerProfileBtn = document.querySelector('[data-route="seller-profile"]');
+            if (sellerProfileBtn) sellerProfileBtn.classList.remove('hidden'); // make visible for seller role logic
+
+            // Seller profile view handlers
+            const sellerForm = document.getElementById('seller-profile-form');
+            if (sellerForm) {
+                sellerForm.addEventListener('submit', saveSellerProfile);
+                const cancel = document.getElementById('seller-profile-cancel');
+                if (cancel) cancel.addEventListener('click', () => { navigateTo('seller-dashboard'); });
+            }
+            // Seller edit button
+            const sellerEditBtn = document.getElementById('seller-edit-btn');
+            if (sellerEditBtn) {
+                sellerEditBtn.addEventListener('click', () => {
+                    if (sellerFormEditable) {
+                        loadSellerProfileToForm();
+                        setSellerFormEditable(false);
+                    } else {
+                        setSellerFormEditable(true);
+                    }
+                });
+            }
+            
+            // 3. Initial setup: Start on the role auth screen
+            navigateTo('auth');
+            lucide.createIcons();
+        }
+
+
+        // --- ENTRY POINT (Modified to include code gate check) ---
+        function initApp() {
+            // 1. Capture DOM elements
+            authForm = document.getElementById('auth-form');
+            consumerNav = document.getElementById('consumer-nav');
+            mainViews = document.querySelectorAll('.main-view');
+            consumerSubViews = document.querySelectorAll('.consumer-sub-view');
+            wishlistForm = document.getElementById('wishlist-form');
+            wishlistContainer = document.getElementById('wishlist-container');
+            
+            const codeForm = document.getElementById('code-gate-form');
+            const appContent = document.getElementById('app');
+            const codeOverlay = document.getElementById('code-gate-overlay');
+
+            // Initial check: if code gate elements are missing, start app immediately (fallback)
+            if (!codeForm || !appContent || !codeOverlay) {
+                console.warn("Code gate elements missing. Starting app content directly.");
+                appContent.style.display = 'block';
+                startAppContent();
+                return;
+            }
+
+            // Show the code gate modal and attach handler
+            codeOverlay.style.display = 'flex';
+            codeForm.addEventListener('submit', handleCodeGate);
+            
+            // Re-render icons for the modal
+            lucide.createIcons();
+        }
+
+        window.onload = initApp;
+
+    </script>
+</body>
+</html>
